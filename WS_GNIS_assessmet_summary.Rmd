@@ -1,0 +1,48 @@
+---
+title: "Untitled"
+author: "Travis Pritchadrd"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+## Waterbody assessments within Watershed Unit
+
+In this watershed unit, data is assessed at the monitoring location scale. These assessment conclusions are rolled into the waterbody (as defined by the [Geographic Names Information System](https://www.usgs.gov/tools/geographic-names-information-system-gnis) (GNIS) name), which is then rolled up into an assessment conclusion for the whole assessment unit.
+
+Details of parameter assessments for each assessed waterbody within the watershed unit can be found below. Te column labeled **Waterbody Category** indicates that category determination for that waterbody/pollutant combination. The column **status_change** indicates the difference, if any, between the 2022 and the 2024 IR cycles. The column labeled **Delist eligibility** indicates if the data was sufficient to delist a previous cycle's impairment.
+
+```{r}
+
+
+load('data/GNIS_Assessments.Rdata')
+GNIS_assessments <- GNIS_assessments %>%
+   filter(AU_ID == params$AU_ID) %>%
+  arrange(AU_GNIS_Name) %>%
+   select( AU_GNIS_Name, Char_Name, Assessment, period, stations,
+          final_GNIS_cat,  Rationale_GNIS,
+          status_change, Delist_eligability
+         ) |> 
+  rename(Waterbody = AU_GNIS_Name,
+         `Waterbody\nCategory` = final_GNIS_cat,
+         `GNIS\nRationale` = Rationale_GNIS,
+         `Status\nchange` = status_change,
+         `Delist\neligability` = Delist_eligability)
+
+DT::datatable(GNIS_assessments,
+               rownames = FALSE,
+              fillContainer = T,
+              extensions = 'Buttons',
+              options = list(scrollY = "270px",
+                             autoWidth = FALSE,
+                            searching = TRUE,
+                           fixedColumns = TRUE, autoWidth = TRUE,
+                           ordering = TRUE, dom = 'tB',
+                           paging = FALSE,
+                           buttons = c('copy', 'csv', 'excel')))
+
+# reactable::reactable(GNIS_assessments,
+#                        height = 270)
+
+```
+
+### 

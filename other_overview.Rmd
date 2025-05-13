@@ -1,0 +1,25 @@
+`r params$AU_ID` is a **`r AU_type`** type assessment unit. Data from all monitoring locations within this assessment unit are pooled and assessed together.
+
+```{r overall_condition, echo=FALSE, message = FALSE, warning=FALSE, results='hide'}
+
+
+load('data/map_display.Rdata')
+
+map_display <- map_display |> 
+  filter(AU_ID == params$AU_ID) |> 
+  mutate(Impaired_parameters = case_when(is.na(Cat_4_parameters) ~ Cat_5_parameters,
+                                         is.na(Cat_5_parameters) ~ Cat_4_parameters,
+                                         TRUE ~ str_c(Cat_5_parameters, Cat_4_parameters, sep = ", ")))
+
+
+```
+
+Overall, this waterbody is **`r map_display$AU_status[[1]]`**.
+
+-   **Impaired parameters:** `r map_display$Impaired_parameters[[1]]`
+
+-   **Attaining parameters:** `r map_display$Attaining_parameters[[1]]`
+
+-   **Insufficient parameters:** `r map_display$Insufficient_parameters[[1]]`
+
+## 

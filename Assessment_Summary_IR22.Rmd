@@ -1,0 +1,141 @@
+---
+output: html_document
+params:
+  AU_ID: 'OR_WS_170502030504_05_103179'
+title: "2024 Integrated Report Assessment Summary"
+subtitle: "`r params$AU_ID`" 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(message = FALSE)
+options(htmltools.preserve.raw = FALSE)
+```
+
+```{r, message = FALSE, warning=FALSE, result = 'asis'}
+# Read in assessments
+
+library(openxlsx)
+library(tidyverse)
+library(httr)
+library(sf)
+library(leaflet)
+library(knitr)
+library(DT)
+
+  AU_type = case_when(str_detect(params$AU_ID, "WS") ~ "Watershed Unit",
+                      str_detect(params$AU_ID, "SR") ~ "River / Stream Unit",
+                      str_detect(params$AU_ID, "EB") ~ "Estuary / Bay Unit",
+                      str_detect(params$AU_ID, "LK") ~ "Lake / Reservoir Unit",
+                      str_detect(params$AU_ID, "CL") ~ "Coastline Unit",
+                      str_detect(params$AU_ID, "OC") ~ "Ocean Unit")
+
+
+  load('data/AU_all_rollup.Rdata')
+AU_all_rollup <-AU_all_rollup %>%
+  filter(AU_ID == params$AU_ID)
+
+
+AU_info <- AU_all_rollup %>%
+  select(AU_ID, AU_Name) %>%
+  distinct()
+
+AU_status <- AU_all_rollup %>%
+  group_by(period) %>%
+  summarise(status = final_AU_cat,
+            year_assessed = max(year_last_assessed),
+            Year_listed = max(Year_listed))
+
+
+WS_unit <- stringr::str_detect(params$AU_ID, "WS")
+
+load('data/AU_all_rollup_display.Rdata')
+AU_all_rollup_display <-AU_all_rollup_display %>%
+    filter(AU_ID == params$AU_ID)
+
+
+
+```
+
+```{r map_chunk, child=if(AU_type == "Watershed Unit") 'WS_overall_map.Rmd' else if (AU_type %in% c("River / Stream Unit", "Coastline Unit")) 'map_linear.Rmd' else 'lentic_map.Rmd'}
+
+```
+
+# Assessment Unit Overall Status
+
+-   **AU Name:** `r AU_info$AU_Name[[1]]`
+
+-   **AU Description:** `r AU_info$AU_Name[[1]]`
+
+-   **AU Type:** `r AU_type`
+
+-   **Overall Status:** `r AU_all_rollup_display$AU_status[[1]]`
+
+-   **Year first listed:** `r ifelse(!all(is.na(AU_all_rollup$Year_listed)),min(AU_all_rollup$Year_listed, na.rm = TRUE),"Not listed")`
+
+-   **Year last assessed:** `r max(AU_all_rollup$year_last_assessed, na.rm = TRUE)`
+
+# Assessment Unit Overview
+
+```{r, child = if (WS_unit) 'WS_overview.Rmd' else 'other_overview.Rmd'}
+```
+
+# Impaired Status
+
+An assessment unit assigned impaired status when data or information show it does not meet narrative or numeric water quality criteria and therefore that at least one beneficial use is not being fully supported. This status can be assigned for the entire year or for a defined season based on the criteria being evaluated and is equivalent to the definition of “water quality limited” in the in Oregon Administrative Rules (OAR) Chapter 340 Division 41 340-041-0002 (70).
+
+```{r, child = if (AU_all_rollup_display$Cat_5_count[[1]] > 0) 'category5.Rmd'}
+```
+
+```{r, child = if (AU_all_rollup_display$Cat_4_count[[1]] > 0) 'category4.Rmd'}
+```
+
+```{r, child = if (AU_all_rollup_display$Cat_4_count[[1]] == 0 &AU_all_rollup_display$Cat_5_count[[1]] == 0) 'Not_impaired.Rmd'}
+```
+
+# Detailed parameter assessments
+
+```{r}
+
+load('data/AU_all_rollup.Rdata')
+
+filtered_assessment <- AU_all_rollup %>%
+  filter(AU_ID == params$AU_ID) %>%
+  select(Char_Name, Assessment, period, stations, 
+         final_AU_cat, Rationale,status_change, year_last_assessed,  Year_listed,TMDLs, TMDL_pollutants,
+         TMDL_Periods,TMDL_Priority, TMDL_Project) |> 
+  rename(Category = final_AU_cat,
+         `status\nchange` = status_change,
+         `year last\nassessed` = year_last_assessed,
+         `TMDL\npollutants` = TMDL_pollutants,
+         `TMDL\nPeriods` = TMDL_Periods,
+         `TMDL\nPriority` = TMDL_Priority,
+         `TMDL\nProject` = TMDL_Project)
+
+```
+
+In the 2024 Integrated Report, DEQ has `r nrow(filtered_assessment)` parameter assessments. Details of these parameter assessments can be found on the [2024 Assessment Database](https://rstudioconnect.deq.state.or.us/2024_IR_Database/). A limited selection of that database can be found below:
+
+```{r}
+
+DT::datatable(filtered_assessment,
+              fillContainer = T,
+              rownames = FALSE,
+              extensions = 'Buttons',
+              options = list(scrollY = "270px",
+                             autoWidth = FALSE,
+                            searching = TRUE,
+                           fixedColumns = TRUE, autoWidth = TRUE,
+                           ordering = TRUE, dom = 'tB',
+                           paging = FALSE,
+                           buttons = c('copy', 'csv', 'excel')))
+
+
+# reactable::reactable(filtered_assessment,
+#                        height = 270)
+
+```
+
+```{r, child = if (WS_unit) 'WS_GNIS_assessmet_summary.Rmd'}
+
+```

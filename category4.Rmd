@@ -1,0 +1,43 @@
+```{r cat4s, echo=FALSE, message = FALSE, warning=FALSE, results='hide'}
+
+
+
+load('data/map_display.Rdata')
+
+map_display <- map_display |> 
+  filter(AU_ID == params$AU_ID) |> 
+  mutate(Impaired_parameters = paste0(Cat_5_parameters, ", ", Cat_4_parameters))
+
+load('data/AU_all_rollup.Rdata')
+
+cat4s <- AU_all_rollup %>%
+  filter(AU_ID == params$AU_ID,
+         str_detect(final_AU_cat, '4')) |> 
+  select(Char_Name, Assessment, period,final_AU_cat, TMDLs, TMDL_pollutants, TMDL_Periods) |> 
+    rename(`AU\ncategory` =final_AU_cat,
+         `TMDL\nPollutants` =TMDL_pollutants,
+         `TMDL\nPeriods` = TMDL_Periods)
+
+```
+
+### Category 4 Assessments
+
+When a parameter is impaired, but not on the 303(d) list, the parameter is categorized with a Category 4 determination. This mostly happens when clean water plans, known as [Total Maximum Daily Loads (TMDLs)](https://www.oregon.gov/deq/wq/tmdls/pages/default.aspx), are developed to address an impaired parameter. The following table shows the Category 4 parameters, and the associated TMDLs, if any.
+
+```{r}
+
+DT::datatable(cat4s,
+              fillContainer = T,
+              rownames = FALSE,
+              extensions = 'Buttons',
+              options = list(scrollY = "270px",
+                             autoWidth = FALSE,
+                            searching = TRUE,
+                           fixedColumns = TRUE, autoWidth = TRUE,
+                           ordering = TRUE, dom = 'tB',
+                           paging = FALSE,
+                           buttons = c('copy', 'csv', 'excel')))
+# 
+# reactable::reactable(cat4s,
+#                        height = 270)
+```

@@ -1,0 +1,73 @@
+`r params$AU_ID` is a **`r AU_type`** type assessment unit. All small streams (1st - 4th order) within this HUC-12 subwatershed are grouped together for reporting purposes. DEQ reports to EPA the overall status of the assessment unit, but for implementation purposes waterbodies have their own status. Waterbodies are defined by the [Geographic Names Information System](https://www.usgs.gov/tools/geographic-names-information-system-gnis) (GNIS) stream names.
+
+Water quality parameters are assessed and summarized based on available data at each monitoring location in this watershed unit. Assessment conclusions at each monitoring location are then rolled up into conclusions at the waterbody level. Waterbody conclusions are then rolled up into an assessment unit conclusion at the watershed unit level. By rolling up assessment conclusions of each parameter from the monitoring location to the waterbody, and then to the watershed unit, an impaired parameter at a single monitoring location will result in the watershed unit being listed as impaired.
+
+```{r overall_condition, echo=FALSE, message = FALSE, warning=FALSE, results='hide'}
+
+
+load('data/map_display.Rdata')
+
+map_display <- map_display |> 
+  filter(AU_ID == params$AU_ID) |> 
+  mutate(Impaired_parameters = paste0(Cat_5_parameters, ", ", Cat_4_parameters))
+
+
+
+```
+
+Overall, this assessment unit is **`r map_display$AU_status[[1]]`**.
+
+-   **Impaired parameters:** `r map_display$Impaired_parameters[[1]]`
+
+-   **Attaining parameters:** `r map_display$Attaining_parameters[[1]]`
+
+-   **Insufficient parameters:** `r map_display$Insufficient_parameters[[1]]`
+
+## Waterbodies within the unit
+
+```{r GNIS_info, echo=FALSE, message = FALSE, warning=FALSE, results='hide'}
+
+load('data/map_display_GNIS.Rdata')
+
+map_display_GNIS_filtered <- map_display_GNIS |> 
+  filter(AU_ID == params$AU_ID)
+
+GNIS_rollup <- map_display_GNIS_filtered |> 
+  mutate(Impaired_parameters = case_when(is.na(Cat_4_parameters) ~ Cat_5_parameters,
+                                         is.na(Cat_5_parameters) ~ Cat_4_parameters,
+                                         TRUE ~ str_c(Cat_5_parameters, Cat_4_parameters, sep = ', '))) |> 
+  select(AU_GNIS_Name, Attaining_parameters, Impaired_parameters, Insufficient_parameters) |> 
+  rename(Waterbody = AU_GNIS_Name,
+        `Attaining\nparameters` = Attaining_parameters,
+        `Impaired\nparameters` = Impaired_parameters,
+        `Insufficient\nparameters` = Insufficient_parameters)
+
+
+```
+
+In a Watershed Unit type assessment unit, each waterbody has unique attainment and impairment conclusions for each parameter assessed within it. The table below illustrates the conclusions of the assessed parameters in each waterbody within this assessment unit. Missing 1st - 4th order streams within the subwatershed are considered unassessed.
+
+```{r, echo=FALSE, results='asis', eval= nrow(GNIS_rollup) == 0}
+
+
+  cat("**There is currently no waterbody data available for this assessment unit. In the 2018/2020 IR, DEQ only kept track of impaired waterbodies within the assessment unit. If there were no previous waterbody impairments, and no data were submitted for the 2022 IR assessment, then waterbody specific information for this assessment unit is not available.**")
+
+
+```
+
+```{r, echo=FALSE, eval= nrow(GNIS_rollup) > 0}
+DT::datatable(GNIS_rollup,
+              rownames = FALSE,
+              fillContainer = T,
+              extensions = 'Buttons',
+              options = list(scrollY = "270px",
+                             autoWidth = FALSE,
+                            searching = TRUE,
+                           fixedColumns = TRUE, autoWidth = TRUE,
+                           ordering = TRUE, dom = 'tB',
+                           paging = FALSE,
+                           buttons = c('copy', 'csv', 'excel')))
+
+# reactable::reactable(GNIS_rollup,
+#                        height = 270,)
+```

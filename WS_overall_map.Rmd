@@ -1,0 +1,136 @@
+---
+title: "Untitled"
+author: "Travis Pritchadrd"
+date: '`r Sys.Date()`'
+output: html_document
+---
+
+```{r map_data, echo=FALSE, message = FALSE, warning=FALSE, results='hide'}
+
+
+paste3 <- function(...,sep=", ") {
+  L <- list(...)
+  L <- lapply(L,function(x) {x[is.na(x)] <- ""; x})
+  ret <-gsub(paste0("(^",sep,"|",sep,"$)"),"",
+             gsub(paste0(sep,sep),sep,
+                  do.call(paste,c(L,list(sep=sep)))))
+  is.na(ret) <- ret==""
+  ret
+}
+
+
+
+# url <- parse_url("https://services.arcgis.com/uUvqNMGPm7axC2dD/ArcGIS/rest/services")
+# 
+# url$path <- paste(url$path, "IR_2024_StateFinal/FeatureServer/7/query", sep = "/")
+# 
+# url$query <- list(where =  paste0("AU_ID= '", params$AU_ID, "'"),
+#                   outFields = "*",
+#                   returnGeometry = "true",
+#                   f = "geojson")
+# 
+# 
+# request <- build_url(url)
+# 
+# 
+# requested_AU <- st_read(request)
+
+requested_AU <- watershed_GIS |>
+   filter(AU_ID == params$AU_ID ) |> 
+   mutate(Impaired_parameters = case_when(is.na(Cat_4_parameters) ~ Cat_5_parameters,
+                                         is.na(Cat_5_parameters) ~ Cat_4_parameters,
+                                         TRUE ~ str_c(Cat_5_parameters, Cat_4_parameters, sep = ', ')))
+# 
+# url <- parse_url("https://services.arcgis.com/uUvqNMGPm7axC2dD/ArcGIS/rest/services")
+# 
+# url$path <- paste(url$path, "IR_2024_StateFinal/FeatureServer/6/query", sep = "/")
+# url$query <- list(where =  paste0("AU_ID= '", params$AU_ID, "'"),
+#                   outFields = "*",
+#                   returnGeometry = "true",
+#                   f = "geojson")
+# 
+# request <- build_url(url)
+# 
+# 
+# 
+# requested_AU_GNIS <- st_read(request)
+
+requested_AU_GNIS <- GNIS_GIS |> 
+  filter(AU_ID == params$AU_ID)
+
+if(nrow(requested_AU_GNIS) > 0){
+requested_AU_GNIS <- requested_AU_GNIS %>%
+   mutate(Impaired_parameters = case_when(is.na(Cat_4_parameters) ~ Cat_5_parameters,
+                                         is.na(Cat_5_parameters) ~ Cat_4_parameters,
+                                         TRUE ~ str_c(Cat_5_parameters, Cat_4_parameters, sep = ', '))) |>  
+  mutate(Attaining_parameters = Attaining_parameters,
+          Insufficient_parameters = Insufficient_parameters
+         ) %>%
+mutate(Attaining_parameters  = ifelse(is.na(Attaining_parameters), "", Attaining_parameters),
+       Impaired_parameters  = ifelse(is.na(Impaired_parameters), "", Impaired_parameters),
+       Insufficient_parameters  = ifelse(is.na(Insufficient_parameters), "", Insufficient_parameters)) |> 
+  mutate(GNIS_status = case_when(Impaired_count > 0 ~ "Impaired",
+                                 Cat_2_count > 0 ~ "Attaining",
+                                 TRUE ~ "Insufficient Data"))
+}
+```
+
+------------------------------------------------------------------------
+
+
+```{r, map, fig.cap=paste("Map of Assessment Unit")}
+
+
+pal <-  colorFactor(c("#01856f", "#9a00c4", '#d5b502'), c("Impaired", "Attaining", "Insufficient Data"))
+
+map <- requested_AU %>%
+  leaflet() %>%
+  #addTiles() %>%
+  addProviderTiles(providers$Esri.WorldStreetMap, group = "Street") %>%
+  addProviderTiles(providers$Esri.WorldImagery, group = "Satellite") %>%
+   leaflet::addWMSTiles("https://basemap.nationalmap.gov/arcgis/services/USGSHydroCached/MapServer/WmsServer",
+                       group = "Hydrography",
+                       #options = leaflet::WMSTileOptions(format = "image/png",
+                                                        # transparent = TRUE,
+                                                         #pane = "hydroTiles"),
+                       layers = "0") %>%
+  addPolygons(color = ~ pal(AU_status),
+              opacity = 0,
+              fillOpacity = 0.15,
+              popup = paste(
+                "<h3>", requested_AU$AU_ID,"</h3>",
+                '<hr class="dashed">',
+                "<strong> Impaired parameters:</strong>", requested_AU$Impaired_parameters, "<br>",
+                "<br>",
+                "<strong>Attaining parameters:</strong>", requested_AU$Attaining_parameters, "<br>",
+                "<br>",
+                "<strong>Insufficient parameters:</strong>", requested_AU$Insufficient_parameters, "<br>"
+              )) 
+
+
+if(nrow(requested_AU_GNIS) > 0){
+map <-   map %>%
+  addPolylines(data = requested_AU_GNIS,
+               color = ~ pal(GNIS_status),
+               dashArray = '5',
+               weight = 3,
+               opacity = 1,
+               popup = paste(
+                 "<h3>", requested_AU_GNIS$AU_GNIS_Name,"</h3>",
+                 '<hr class="dashed">',
+                 "<strong> Impaired parameters:</strong>", requested_AU_GNIS$Impaired_parameters, "<br>",
+                 "<br>",
+                 "<strong>Attaining parameters:</strong>", requested_AU_GNIS$Attaining_parameters, "<br>",
+                 "<br>",
+                 "<strong>Insufficient parameters:</strong>", requested_AU_GNIS$Insufficient_parameters, "<br>"
+               ))
+}
+
+map %>%
+      addLayersControl(
+    baseGroups = c("Street", "Satellite", 'Hydrography'),
+    #overlayGroups = c("Hydrography"),
+    options = layersControlOptions(collapsed = FALSE)
+  ) %>%
+  addLegend("bottomright", pal = pal, values = ~ c("Impaired", "Attaining", "Insufficient Data"), title = "IR Status")
+```

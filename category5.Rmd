@@ -1,0 +1,40 @@
+```{r cat5s, echo=FALSE, message = FALSE, warning=FALSE, results='hide'}
+
+load('data/map_display.Rdata')
+
+map_display <- map_display |> 
+  filter(AU_ID == params$AU_ID) |> 
+  mutate(Impaired_parameters = paste0(Cat_5_parameters, ", ", Cat_4_parameters))
+
+load('data/AU_all_rollup.Rdata')
+
+cat5s <- AU_all_rollup %>% 
+  filter(AU_ID == params$AU_ID, str_detect(final_AU_cat, '5')) |> 
+  select(Char_Name, Assessment, period,final_AU_cat, TMDL_Priority, TMDL_Project, TMDL_issue_year) |> 
+  rename(`AU\ncategory` =final_AU_cat,
+         `TMDL\nPriority` =TMDL_Priority,
+         `TMDL\nProject` = TMDL_Project,
+         `TMDL\nIssue year` = TMDL_issue_year)
+
+```
+
+### Category 5 – 303(d) list
+
+If an impaired parameter needs a TMDL it is included on the 303(d) list along with a priority ranking for TMDL development. This is the classification is commonly referred to as “listed waters” or Category 5 waters. This assessment unit has `r nrow(cat5s)` parameters on the 303(d) list.
+
+```{r}
+DT::datatable(cat5s,
+              fillContainer = T,
+                     rownames = FALSE,
+              extensions = 'Buttons',
+              options = list(scrollY = "270px",
+                             autoWidth = FALSE,
+                            searching = TRUE,
+                           fixedColumns = TRUE, autoWidth = TRUE,
+                           ordering = TRUE, dom = 'tB',
+                           paging = FALSE,
+                           buttons = c('copy', 'csv', 'excel')))
+
+# reactable::reactable(cat5s,
+#                        height = 270)
+```
